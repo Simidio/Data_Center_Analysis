@@ -3,13 +3,18 @@ import pandas as pd        # Libreria per manipolazione dati
 import numpy as np         # Libreria per calcoli numerici
 import plotly.express as px  # Libreria per grafici interattivi semplici
 import plotly.graph_objects as go  # Libreria per grafici più personalizzabili
+import os
 
 # =====================================================================================================
 # === STEP 1 - LOAD & FILTER DATA =====================================================================
 # =====================================================================================================
 
 # Percorso del file Excel e parametri base
-EXCEL_PATH = rcd
+
+# Costruisce il percorso assoluto in base alla posizione del file Python
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_PATH = os.path.join(BASE_DIR, "Hourly CSS - Actual - Analysis.xlsx")
+
 SHEET_NAME = "Hourly CSS - Actual"
 DATE_COL = "DateTime"
 CSS_COL = "North CSS"
