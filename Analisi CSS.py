@@ -12,8 +12,7 @@ import os
 # Percorso del file Excel e parametri base
 
 # Costruisce il percorso assoluto in base alla posizione del file Python
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-EXCEL_PATH = os.path.join(BASE_DIR, "Hourly CSS - Actual - Analysis.xlsx")
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), "Hourly CSS - Actual - Analysis.xlsx")
 
 SHEET_NAME = "Hourly CSS - Actual"
 DATE_COL = "DateTime"
