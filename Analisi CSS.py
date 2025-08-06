@@ -340,7 +340,7 @@ st.markdown("### 🎯 Set Your Target Market CSS")
 css_market_sim = st.slider(
     label="Simulated Market CSS (€/MWh)",
     min_value=-100.0, max_value=100.0,
-    value=10, step=1.0
+    value=10.0, step=1.0
 )
 
 st.markdown("### 📋 Key Offer Combinations (Based on Selected Market CSS)")
@@ -581,4 +581,4 @@ st.plotly_chart(fig_expost, use_container_width=True)
 
 # git commit -m "Aggiornamento codice" → salva le modifiche localmente con un messaggio
 
-# ggit push origin main → invia le modifiche a GitHub (branch main)
+# git push origin main → invia le modifiche a GitHub (branch main)
