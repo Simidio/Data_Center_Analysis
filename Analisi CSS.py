@@ -339,8 +339,8 @@ st.markdown("### 🎯 Set Your Target Market CSS")
 # Slider per simulare un CSS di mercato di riferimento
 css_market_sim = st.slider(
     label="Simulated Market CSS (€/MWh)",
-    min_value=-50.0, max_value=150.0,
-    value=float(css_target_price), step=1.0
+    min_value=-100.0, max_value=100.0,
+    value=10, step=1.0
 )
 
 st.markdown("### 📋 Key Offer Combinations (Based on Selected Market CSS)")
@@ -568,3 +568,17 @@ st.plotly_chart(fig_expost, use_container_width=True)
 # =====================================================================================================
 
 # streamlit run "Data Center Analysis/Analisi CSS.py"
+
+
+
+# =====================================================================================================
+# === STEP 14 - AGGIORNA GIT ==========================================================================
+# =====================================================================================================
+
+# Apri il terminale nella cartella  dove c'è il progetto -> cd "C:\Users\82502407\PyCharmMiscProject\Data Center Analysis"
+
+# git add . → aggiunge tutti i file modificati
+
+# git commit -m "Aggiornamento codice" → salva le modifiche localmente con un messaggio
+
+# ggit push origin main → invia le modifiche a GitHub (branch main)
