@@ -40,22 +40,26 @@ except FileNotFoundError:
 df[DATE_COL] = pd.to_datetime(df[DATE_COL])
 df = df[[DATE_COL, CSS_COL]].dropna()
 
-# Aggiungo colonna "Year" per filtro anni
+# Aggiungo colonna "Year" e "Month" per filtro anni
 df["Year"] = df[DATE_COL].dt.year
-available_years = sorted(df["Year"].unique())[::-1]
-year_options = ["All years"] + [str(y) for y in available_years]
+df["Month"] = df[DATE_COL].dt.month
+
+df["YearLabel"] = df.apply(lambda row: "2025" if (row["Year"] == 2025 and row["Month"] <= 6) else ("2024" if (row["Year"] == 2024 and row["Month"] >= 7) else str(row["Year"])), axis=1)
 
 # Filtro anno lato sidebar
-selected_year = st.sidebar.selectbox("📅 Select Year", year_options)
-if selected_year != "All years":
-    df = df[df["Year"] == int(selected_year)]
+st.sidebar.header("📅 Select Analysis Period")
+period_choice = st.sidebar.selectbox("Period:", ["All years", "Last year (2024-2025)", "Last 2 years (2023-2025)"])
 
-# Periodo analizzato (ultimi 3 anni)
+if period_choice == "Last year (2024-2025)":
+df = df[(df["Year"] == 2024) & (df["Month"] >= 7) | (df["Year"] == 2025) & (df["Month"] <= 6)]
+elif period_choice == "Last 2 years (2023-2025)":
+# O l'anno non è 2025, oppure (se è 2025) il mese deve essere ≤ 6
+df = df[(df["Year"] >= 2023) & ((df["Year"] != 2025) | (df["Month"] <= 6))]
+
+# Periodo analizzato
 last_ts = df[DATE_COL].max()
-start_period = last_ts - pd.DateOffset(years=3)
-df = df[df[DATE_COL] >= start_period].copy()
-
-st.markdown(f"**Period analyzed:** {start_period.date()} – {last_ts.date()}  \n**Total hours:** {len(df)}")
+start_period = df[DATE_COL].min()
+st.markdown(f"**Period analyzed:** {start_period.date()} – {last_ts.date()} \n**Total hours:** {len(df)}")
 
 
 # =====================================================================================================
@@ -65,7 +69,13 @@ st.markdown(f"**Period analyzed:** {start_period.date()} – {last_ts.date()}  \
 st.sidebar.header("⚙️ Parameters")
 var_level = st.sidebar.selectbox("Confidence Level (VaR)", [0.95, 0.975, 0.99], index=0)
 risk_metric = st.sidebar.radio("Risk Measure Type", ["VaR", "CVaR"], index=0)
-css_safety_premium = st.sidebar.slider("CSS Safety Margin (€)", 0, 20, 5)
+st.sidebar.markdown("### Cost Components (€)")
+gas_fee = st.sidebar.slider("Gas Fee", 0, 15, 3)
+tax_cost = st.sidebar.slider("Tax", 0, 15, 11)
+msd_opportunity = st.sidebar.slider("MSD Market Opportunity", 0, 15, 3)
+capacity_opportunity = st.sidebar.slider("Capacity Market Opportunity", 0, 15, 5)
+mark_up = st.sidebar.slider("Mark Up (Mix of Costs)", 0, 15, 5)
+css_safety_premium = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + mark_up
 msl = st.sidebar.number_input("Min Stable Load (MW)", min_value=0, value=197)
 max_capacity = st.sidebar.number_input("Max Capacity (MW)", min_value=msl, value=385)
 
@@ -204,31 +214,64 @@ else:
     st.warning("⚠️ 'FWD' sheet is empty or not available in the Excel file.")
 
 
+
 # =====================================================================================================
-# === User-defined Price for Subsequent Analysis ======================================================
+# === STEP 4 Target Price Calculation: Cost-based + VaR Check ================================================
 # =====================================================================================================
 st.markdown("---")
-
-st.markdown("### Set Your Target Price for Subsequent Analysis")
+st.markdown("### 🎯 Commercial Target Price Construction")
 st.markdown("""
-Select a **custom target price (€/MWh)** to override the default value based on VaR + margin.  
-All subsequent charts and simulations will use this price as the reference threshold.
+The **target price** is initially computed as a sum of selected cost components and a commercial markup.  
+We also run a **VaR check** to assess whether the pricing is sufficiently protective against downside risk.
 """)
 
-# Slider per definire il nuovo prezzo di riferimento
+# Costi selezionati nella sidebar (definiti in precedenza)
+# gas_fee, tax_cost, msd_opportunity, capacity_opportunity, markup_commercial
+
+# Calcolo target price base
+target_price_base = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + markup_commercial
+
+# Check: è sopra il VaR?
+var_check_result = "🟢 Risk Covered"
+var_check_color = "green"
+if css_target_price < risk_value:
+    var_check_result = "🔴 Below VaR!"
+    var_check_color = "red"
+elif css_target_price < risk_value + 5:
+    var_check_result = "🟡 Close to VaR"
+    var_check_color = "orange"
+
+# Mostro formula e breakdown
+st.markdown("#### 🔍 Target Price Breakdown")
+st.markdown(f"""
+- Gas Fee: `{gas_fee:.2f} €/MWh`  
+- Tax: `{tax_cost:.2f} €/MWh`  
+- MSD Opportunity: `{msd_opportunity:.2f} €/MWh`  
+- Capacity Market: `{capacity_opportunity:.2f} €/MWh`  
+- Commercial Markup: `{markup_commercial:.2f} €/MWh`  
+**→ Base Target Price:** `{target_price_base:.2f} €/MWh`
+""")
+
+# Visual semaforo VaR
+st.markdown("#### ✅ VaR Consistency Check")
+st.markdown(f"**Selected Price vs VaR:** `{css_target_price:.2f} €` vs `{risk_value:.2f} €`")
+st.markdown(f"**Result:** `{var_check_result}`")
+
+# Slider per override
+st.markdown("#### ✏️ Override Target Price (Optional)")
 css_target_price = st.slider(
     "Custom Target Price (€/MWh)",
     min_value=float(min(css_values.min(), fwd_values.min())),
     max_value=float(max(css_values.max(), fwd_values.max())),
-    value=float(css_target_price),  # default = prezzo calcolato da VaR + margin
+    value=float(target_price_base),
     step=0.5
 )
 
-# Aggiorna anche il premium DC in base al nuovo prezzo
+# Aggiorna premium DC
 premium_dc = MAX_FEE_SAVING - css_target_price
 
-st.markdown(f"**📌 New Target Price:** `{css_target_price:.2f} €/MWh`")
-st.markdown(f"**📌 Updated DC Premium:** `{premium_dc:.2f} €/MWh`")
+st.markdown(f"**📌 Final Target Price Used:** `{css_target_price:.2f} €/MWh`")
+st.markdown(f"**📌 Resulting DC Premium:** `{premium_dc:.2f} €/MWh`")
 
 
 
@@ -499,11 +542,11 @@ st.plotly_chart(fig_attivabili, use_container_width=True)
 # =====================================================================================================
 st.markdown("---")
 
-st.markdown("## 📊 Ex-Post Margin Analysis (Selected Year)")
+st.markdown("## 📊 Ex-Post Margin Analysis (Historical Years)")
 st.markdown("""
-This section allows you to **simulate the margins** that would have been generated by applying  
+This section simulates the margins that would have been generated by applying  
 the selected **target price** to a chosen DC contracted volume,  
-using **real hourly prices** from a specific year.
+using **real hourly CSS prices** from selected historical years.
 """)
 
 #  Ricarico i dati completi senza filtri precedenti
@@ -511,29 +554,32 @@ df_all_years = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
 df_all_years[DATE_COL] = pd.to_datetime(df_all_years[DATE_COL])
 df_all_years = df_all_years[[DATE_COL, CSS_COL]].dropna()
 
-#  Scelta anno per analisi ex-post
-years_available = sorted(df_all_years[DATE_COL].dt.year.unique())
-year_expost = st.selectbox("Select Year for Ex-Post Analysis", years_available, index=len(years_available)-1)
+#  Selezione periodo: All, Last Year (2024–2025), Last 2 Years (2023–2025)
+st.markdown("### Select Historical Period")
+analysis_year_option = st.radio("Select Period", ["Last Year (2024–2025)", "Last 2 Years (2023–2025)", "All Years"])
 
-#  Filtro solo l'anno selezionato
-df_current = df_all_years[df_all_years[DATE_COL].dt.year == year_expost].copy()
+if analysis_year_option == "Last Year (2024–2025)":
+    df_current = df_all_years[df_all_years[DATE_COL] >= pd.to_datetime("2024-01-01")]
+elif analysis_year_option == "Last 2 Years (2023–2025)":
+    df_current = df_all_years[df_all_years[DATE_COL] >= pd.to_datetime("2023-01-01")]
+else:
+    df_current = df_all_years.copy()
 
 #  Scelta volume DC
 dc_mw_expost = st.slider(
-    "Select DC Volume for Ex-Post Simulation (MW)",  # testo principale
+    "Select DC Volume for Ex-Post Simulation (MW)",
     min_value=50,
     max_value=int(max_capacity),
     value=int(max_capacity),
     step=25
 )
 
-# Testo esplicativo aggiuntivo
 st.markdown(
     "_ℹ️ If DC volume ≥ Min Stable Load (MSL), then residual volumes = 0 and all capacity is sold to the DC at the contract price._"
 )
 
 #  Calcolo margini
-residual_mw_expost = max(msl - dc_mw_expost, 0)  # MW residui esposti al mercato
+residual_mw_expost = max(msl - dc_mw_expost, 0)
 df_current["DC_Margin"] = dc_mw_expost * css_target_price
 df_current["Residual_Margin"] = residual_mw_expost * df_current[CSS_COL]
 df_current["Total_Margin"] = df_current["DC_Margin"] + df_current["Residual_Margin"]
@@ -544,9 +590,9 @@ avg_margin_hour = df_current["Total_Margin"].mean()
 
 #  Output riepilogo
 st.markdown(f"""
-** Year analysed:** {year_expost}  
+** Period analysed:** {df_current[DATE_COL].min().date()} – {df_current[DATE_COL].max().date()}  
 ** DC Volume:** {dc_mw_expost} MW  
-** Total Margin (Margin = (DC_MW × target price) + (Residual_MW × Market CSS)):** `{total_margin_year:,.0f} €`  
+** Total Margin:** `{total_margin_year:,.0f} €`  
 ** Avg Hourly Margin:** `{avg_margin_hour:.2f} €/h`
 """)
 
@@ -555,16 +601,71 @@ fig_expost = px.line(
     df_current,
     x=DATE_COL,
     y="Total_Margin",
-    title=f"📈 Hourly Total Margin - Ex-Post Simulation ({year_expost})",
+    title=f"📈 Hourly Total Margin – Ex-Post Simulation",
     labels={DATE_COL: "Date", "Total_Margin": "Margin (€/h)"}
 )
 st.plotly_chart(fig_expost, use_container_width=True)
 
+# =====================================================================================================
+# === STEP 13 - Ex-Ante Margin Analysis (Forward Year 2026) ===========================================
+# =====================================================================================================
+st.markdown("---")
+
+st.markdown("## 🔮 Ex-Ante Margin Simulation – Based on 2026 Forward CSS")
+st.markdown("""
+This simulation uses **forward hourly CSS prices for 2026** to estimate margins under the current contract design.  
+It represents a **forward-looking view** and assumes the CSS behaves as forecasted in the FWD sheet.
+""")
+
+try:
+    df_fwd_2026 = pd.read_excel(EXCEL_PATH, sheet_name="FWD 2026")
+    df_fwd_2026["Data"] = pd.to_datetime(df_fwd_2026["Data"])
+    df_fwd_2026 = df_fwd_2026.dropna(subset=["CSS EP FWD"])
+
+    # Scelta volume DC
+    dc_mw_exante = st.slider(
+        "Select DC Volume for Ex-Ante Simulation (MW)",
+        min_value=50,
+        max_value=int(max_capacity),
+        value=int(max_capacity),
+        step=25
+    )
+
+    # Calcolo margini
+    residual_mw_exante = max(msl - dc_mw_exante, 0)
+    df_fwd_2026["DC_Margin"] = dc_mw_exante * css_target_price
+    df_fwd_2026["Residual_Margin"] = residual_mw_exante * df_fwd_2026["CSS EP FWD"]
+    df_fwd_2026["Total_Margin"] = df_fwd_2026["DC_Margin"] + df_fwd_2026["Residual_Margin"]
+
+    # KPI aggregati
+    total_margin_fwd = df_fwd_2026["Total_Margin"].sum()
+    avg_margin_hour_fwd = df_fwd_2026["Total_Margin"].mean()
+
+    # Output riepilogo
+    st.markdown(f"""
+    ** Period analysed:** {df_fwd_2026['Data'].min().date()} – {df_fwd_2026['Data'].max().date()}  
+    ** DC Volume:** {dc_mw_exante} MW  
+    ** Total Margin (Simulated):** `{total_margin_fwd:,.0f} €`  
+    ** Avg Hourly Margin:** `{avg_margin_hour_fwd:.2f} €/h`
+    """)
+
+    # Grafico
+    fig_exante = px.line(
+        df_fwd_2026,
+        x="Data",
+        y="Total_Margin",
+        title="📈 Hourly Total Margin – Ex-Ante Simulation (2026 Forward)",
+        labels={"Data": "Date", "Total_Margin": "Margin (€/h)"}
+    )
+    st.plotly_chart(fig_exante, use_container_width=True)
+
+except Exception as e:
+    st.warning(f"⚠️ Unable to perform ex-ante analysis: {e}")
 
 
 
 # =====================================================================================================
-# === STEP 13 - STREAMLIT RUN =========================================================================
+# === STEP 14 - STREAMLIT RUN =========================================================================
 # =====================================================================================================
 
 # streamlit run "Data Center Analysis/Analisi CSS.py"
@@ -572,10 +673,10 @@ st.plotly_chart(fig_expost, use_container_width=True)
 
 
 # =====================================================================================================
-# === STEP 14 - AGGIORNA GIT ==========================================================================
+# === STEP 15 - AGGIORNA GIT ==========================================================================
 # =====================================================================================================
 
-# Apri il terminale nella cartella  dove c'è il progetto -> cd "C:\Users\82502407\PyCharmMiscProject\Data Center Analysis"
+# Apri il terminale nella cartella dove c'è il progetto -> cd "C:\Users\82502407\PyCharmMiscProject\Data Center Analysis"
 
 # git add . → aggiunge tutti i file modificati
 
