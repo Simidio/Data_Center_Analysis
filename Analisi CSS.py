@@ -40,7 +40,7 @@ except FileNotFoundError:
 df[DATE_COL] = pd.to_datetime(df[DATE_COL])
 df = df[[DATE_COL, CSS_COL]].dropna()
 
-# Aggiungo colonna "Year" e "Month" per filtro anni
+# Aggiungo colonna "Year" e "Month"
 df["Year"] = df[DATE_COL].dt.year
 df["Month"] = df[DATE_COL].dt.month
 
@@ -51,15 +51,14 @@ st.sidebar.header("📅 Select Analysis Period")
 period_choice = st.sidebar.selectbox("Period:", ["All years", "Last year (2024-2025)", "Last 2 years (2023-2025)"])
 
 if period_choice == "Last year (2024-2025)":
-df = df[(df["Year"] == 2024) & (df["Month"] >= 7) | (df["Year"] == 2025) & (df["Month"] <= 6)]
+    df = df[(df["Year"] == 2024) & (df["Month"] >= 7) | (df["Year"] == 2025) & (df["Month"] <= 6)]
 elif period_choice == "Last 2 years (2023-2025)":
-# O l'anno non è 2025, oppure (se è 2025) il mese deve essere ≤ 6
-df = df[(df["Year"] >= 2023) & ((df["Year"] != 2025) | (df["Month"] <= 6))]
+    df = df[(df["Year"] >= 2023) & ((df["Year"] != 2025) | (df["Month"] <= 6))]
 
 # Periodo analizzato
 last_ts = df[DATE_COL].max()
 start_period = df[DATE_COL].min()
-st.markdown(f"**Period analyzed:** {start_period.date()} – {last_ts.date()} \n**Total hours:** {len(df)}")
+st.markdown(f"**Period analyzed:** {start_period.date()} – {last_ts.date()}  \n**Total hours:** {len(df)}")
 
 
 # =====================================================================================================
@@ -226,10 +225,10 @@ We also run a **VaR check** to assess whether the pricing is sufficiently protec
 """)
 
 # Costi selezionati nella sidebar (definiti in precedenza)
-# gas_fee, tax_cost, msd_opportunity, capacity_opportunity, markup_commercial
+# gas_fee, tax_cost, msd_opportunity, capacity_opportunity, mark_up
 
 # Calcolo target price base
-target_price_base = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + markup_commercial
+target_price_base = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + mark_up
 
 # Check: è sopra il VaR?
 var_check_result = "🟢 Risk Covered"
@@ -248,7 +247,7 @@ st.markdown(f"""
 - Tax: `{tax_cost:.2f} €/MWh`  
 - MSD Opportunity: `{msd_opportunity:.2f} €/MWh`  
 - Capacity Market: `{capacity_opportunity:.2f} €/MWh`  
-- Commercial Markup: `{markup_commercial:.2f} €/MWh`  
+- Commercial Markup: `{mark_up:.2f} €/MWh`  
 **→ Base Target Price:** `{target_price_base:.2f} €/MWh`
 """)
 
