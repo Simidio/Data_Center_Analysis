@@ -137,8 +137,8 @@ fig_hist.update_layout(
 st.plotly_chart(fig_hist, use_container_width=True)
 
 st.metric(f"{risk_metric} at {int(var_level*100)}%", f"{risk_value:.2f} €/MWh")
-st.markdown(f"**Suggested Price (Abs {risk_metric} + margin):** `{css_target_price:.2f} €/MWh`")
-st.markdown(f"**Discount to DC vs. 60€ ref.:** `{premium_dc:.2f} €/MWh`")
+
+
 
 # =====================================================================================================
 # === STEP 4 - CSS DISTRIBUTION CHART =================================================================
@@ -217,6 +217,9 @@ else:
 # =====================================================================================================
 # === STEP 4 Target Price Calculation: Cost-based + VaR Check ================================================
 # =====================================================================================================
+st.markdown(f"Suggested Price (Abs {risk_metric} + margin):** `{css_target_price:.2f} €/MWh`")
+st.markdown(f"Discount to DC vs. 60€ ref.:** `{premium_dc:.2f} €/MWh`")
+
 st.markdown("---")
 st.markdown("### 🎯 Commercial Target Price Construction")
 st.markdown("""
@@ -253,7 +256,7 @@ st.markdown(f"""
 
 # Visual semaforo VaR
 st.markdown("#### ✅ VaR Consistency Check")
-st.markdown(f"**Selected Price vs VaR:** `{css_target_price:.2f} €` vs `{risk_value:.2f} €`")
+st.markdown(f"**Selected Price vs VaR:** `{target_price_base:.2f} €` vs `{risk_value:.2f} €`")
 st.markdown(f"**Result:** `{var_check_result}`")
 
 # Slider per override
@@ -617,7 +620,7 @@ It represents a **forward-looking view** and assumes the CSS behaves as forecast
 """)
 
 try:
-    df_fwd_2026 = pd.read_excel(EXCEL_PATH, sheet_name="FWD 2026")
+    df_fwd_2026 = pd.read_excel(EXCEL_PATH, sheet_name="FWD")
     df_fwd_2026["Data"] = pd.to_datetime(df_fwd_2026["Data"])
     df_fwd_2026 = df_fwd_2026.dropna(subset=["CSS EP FWD"])
 
