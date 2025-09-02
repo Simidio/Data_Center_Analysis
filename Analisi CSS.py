@@ -93,6 +93,40 @@ css_safety_premium = tax_cost + msd_opportunity + capacity_opportunity + mark_up
 msl = st.sidebar.number_input("Min Stable Load (MW)", min_value=0, value=197)
 max_capacity = st.sidebar.number_input("Max Capacity (MW)", min_value=msl, value=385)
 
+# =====================================================================================
+# === HISTOGRAM: CSS Distribution with Highlight on Negative Area =====================
+# =====================================================================================
+
+st.markdown("### 📉 CSS Distribution – Historical (Jul 2024 – Jun 2025)")
+
+fig = go.Figure()
+
+# Istogramma generale CSS
+fig.add_trace(go.Histogram(
+    x=df[CSS_COL],
+    nbinsx=80,
+    marker_color='lightblue',
+    name='CSS Distribution'
+))
+
+# Istogramma in rosso per i valori negativi
+fig.add_trace(go.Histogram(
+    x=df[df[CSS_COL] < 0][CSS_COL],
+    nbinsx=80,
+    marker_color='indianred',
+    name='Negative CSS Area',
+    opacity=0.75
+))
+
+fig.update_layout(
+    barmode='overlay',
+    title="CSS Distribution (North CSS no max)",
+    xaxis_title="CSS (€/MWh)",
+    yaxis_title="Frequency",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================================================================
 # === STEP 3 - RISK & PRICE CALCULATION ===============================================================
