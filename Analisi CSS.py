@@ -48,7 +48,7 @@ df["YearLabel"] = df.apply(lambda row: "2025" if (row["Year"] == 2025 and row["M
 
 # Filtro anno lato sidebar
 st.sidebar.header("📅 Select Analysis Period")
-period_choice = st.sidebar.selectbox("Period:", ["All years", "Last year (2024-2025)", "Last 2 years (2023-2025)"])
+period_choice = st.sidebar.selectbox("Period:", ["Last year (2024-2025)", "Last 2 years (2023-2025)"])
 
 if period_choice == "Last year (2024-2025)":
     df = df[(df["Year"] == 2024) & (df["Month"] >= 7) | (df["Year"] == 2025) & (df["Month"] <= 6)]
@@ -69,11 +69,12 @@ st.sidebar.header("⚙️ Parameters")
 var_level = st.sidebar.selectbox("Confidence Level (VaR)", [0.95, 0.975, 0.99], index=0)
 risk_metric = st.sidebar.radio("Risk Measure Type", ["VaR", "CVaR"], index=0)
 st.sidebar.markdown("### Cost Components (€)")
-gas_fee = st.sidebar.slider("Gas Fee", 0, 15, 3)
 tax_cost = st.sidebar.slider("Tax", 0, 15, 11)
 msd_opportunity = st.sidebar.slider("MSD Market Opportunity", 0, 15, 3)
 capacity_opportunity = st.sidebar.slider("Capacity Market Opportunity", 0, 15, 5)
-mark_up = st.sidebar.slider("Mark Up (Mix of Costs)", 0, 15, 5)
+fixed_cost = st.sidebar.slider("Fixed Cost", 0, 15, 3)
+variable_cost = st.sidebar.slider("Variable Cost", 0, 15, 1)
+mark_up = st.sidebar.slider("Mark Up", 0, 15, 5)
 css_safety_premium = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + mark_up
 msl = st.sidebar.number_input("Min Stable Load (MW)", min_value=0, value=197)
 max_capacity = st.sidebar.number_input("Max Capacity (MW)", min_value=msl, value=385)
@@ -212,14 +213,14 @@ if df_fwd is not None and not df_fwd.empty:
 else:
     st.warning("⚠️ 'FWD' sheet is empty or not available in the Excel file.")
 
+st.markdown(f"Suggested Price (Abs {risk_metric} + margin):** `{css_target_price:.2f} €/MWh`")
+st.markdown(f"Discount to DC vs. 60€ ref.:** `{premium_dc:.2f} €/MWh`")
+
 
 
 # =====================================================================================================
 # === STEP 4 Target Price Calculation: Cost-based + VaR Check ================================================
 # =====================================================================================================
-st.markdown(f"Suggested Price (Abs {risk_metric} + margin):** `{css_target_price:.2f} €/MWh`")
-st.markdown(f"Discount to DC vs. 60€ ref.:** `{premium_dc:.2f} €/MWh`")
-
 st.markdown("---")
 st.markdown("### 🎯 Commercial Target Price Construction")
 st.markdown("""
@@ -231,7 +232,7 @@ We also run a **VaR check** to assess whether the pricing is sufficiently protec
 # gas_fee, tax_cost, msd_opportunity, capacity_opportunity, mark_up
 
 # Calcolo target price base
-target_price_base = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + mark_up
+target_price_base = tax_cost + msd_opportunity + capacity_opportunity + mark_up + fixed_cost + variable_cost
 
 # Check: è sopra il VaR?
 var_check_result = "🟢 Risk Covered"
@@ -556,14 +557,24 @@ df_all_years = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
 df_all_years[DATE_COL] = pd.to_datetime(df_all_years[DATE_COL])
 df_all_years = df_all_years[[DATE_COL, CSS_COL]].dropna()
 
+st.markdown("### CSS Target Price")
+st.markdown(f"**📌 Final Target Price Used:** `{css_target_price:.2f} €/MWh`")
+
 #  Selezione periodo: All, Last Year (2024–2025), Last 2 Years (2023–2025)
 st.markdown("### Select Historical Period")
 analysis_year_option = st.radio("Select Period", ["Last Year (2024–2025)", "Last 2 Years (2023–2025)", "All Years"])
 
 if analysis_year_option == "Last Year (2024–2025)":
-    df_current = df_all_years[df_all_years[DATE_COL] >= pd.to_datetime("2024-01-01")]
+    df_current = df_all_years[
+        ((df_all_years[DATE_COL].dt.year == 2024) & (df_all_years[DATE_COL].dt.month >= 7)) |
+        ((df_all_years[DATE_COL].dt.year == 2025) & (df_all_years[DATE_COL].dt.month <= 6))
+    ]
 elif analysis_year_option == "Last 2 Years (2023–2025)":
-    df_current = df_all_years[df_all_years[DATE_COL] >= pd.to_datetime("2023-01-01")]
+    df_current = df_all_years[
+        ((df_all_years[DATE_COL].dt.year == 2023)) |
+        ((df_all_years[DATE_COL].dt.year == 2024)) |
+        ((df_all_years[DATE_COL].dt.year == 2025) & (df_all_years[DATE_COL].dt.month <= 6))
+    ]
 else:
     df_current = df_all_years.copy()
 
@@ -621,7 +632,8 @@ It represents a **forward-looking view** and assumes the CSS behaves as forecast
 
 try:
     df_fwd_2026 = pd.read_excel(EXCEL_PATH, sheet_name="FWD")
-    df_fwd_2026["Data"] = pd.to_datetime(df_fwd_2026["Data"])
+    # Filtro coerente anche per ex-ante (forward 2026)
+    df_fwd_2026 = df_fwd_2026[df_fwd_2026["Data"].dt.year == 2026]
     df_fwd_2026 = df_fwd_2026.dropna(subset=["CSS EP FWD"])
 
     # Scelta volume DC
@@ -642,6 +654,9 @@ try:
     # KPI aggregati
     total_margin_fwd = df_fwd_2026["Total_Margin"].sum()
     avg_margin_hour_fwd = df_fwd_2026["Total_Margin"].mean()
+
+    st.markdown("### CSS Target Price")
+    st.markdown(f"**📌 Final Target Price Used:** `{css_target_price:.2f} €/MWh`")
 
     # Output riepilogo
     st.markdown(f"""
