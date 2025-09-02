@@ -16,7 +16,6 @@ EXCEL_PATH = os.path.join(os.path.dirname(__file__), "Hourly CSS - Actual - Anal
 
 SHEET_NAME = "Hourly CSS - Actual"
 DATE_COL = "DateTime"
-CSS_COL = "North CSS"
 MAX_FEE_SAVING = 60  # €/MWh di saving massimo per il Data Center
 
 # Titolo dell'app
@@ -36,8 +35,23 @@ except FileNotFoundError:
     st.error(f"❌ File not found: {EXCEL_PATH}")
     st.stop()
 
-# Conversione colonna data e pulizia dati
+# Conversione colonna data
 df[DATE_COL] = pd.to_datetime(df[DATE_COL])
+
+# === SELEZIONE COLONNA CSS =====================================================
+st.sidebar.header("📈 Select CSS Input Column")
+
+css_options = {
+    "Hourly CSS": "Hourly CSS",
+    "North CSS": "North CSS",
+    "Hourly CSS (no max)": "Hourly CSS no max",
+    "North CSS (no max)": "North CSS no max"
+}
+
+selected_css_label = st.sidebar.selectbox("CSS Series", list(css_options.keys()))
+CSS_COL = css_options[selected_css_label]
+
+# Applica il filtro sulle colonne scelte
 df = df[[DATE_COL, CSS_COL]].dropna()
 
 # Aggiungo colonna "Year" e "Month"
@@ -75,7 +89,7 @@ capacity_opportunity = st.sidebar.slider("Capacity Market Opportunity", 0, 15, 5
 fixed_cost = st.sidebar.slider("Fixed Cost", 0, 15, 3)
 variable_cost = st.sidebar.slider("Variable Cost", 0, 15, 1)
 mark_up = st.sidebar.slider("Mark Up", 0, 15, 5)
-css_safety_premium = gas_fee + tax_cost + msd_opportunity + capacity_opportunity + mark_up
+css_safety_premium = tax_cost + msd_opportunity + capacity_opportunity + mark_up
 msl = st.sidebar.number_input("Min Stable Load (MW)", min_value=0, value=197)
 max_capacity = st.sidebar.number_input("Max Capacity (MW)", min_value=msl, value=385)
 
@@ -246,11 +260,12 @@ elif css_target_price < risk_value + 5:
 
 # Mostro formula e breakdown
 st.markdown("#### 🔍 Target Price Breakdown")
-st.markdown(f"""
-- Gas Fee: `{gas_fee:.2f} €/MWh`  
+st.markdown(f"""  
 - Tax: `{tax_cost:.2f} €/MWh`  
 - MSD Opportunity: `{msd_opportunity:.2f} €/MWh`  
-- Capacity Market: `{capacity_opportunity:.2f} €/MWh`  
+- Capacity Market: `{capacity_opportunity:.2f} €/MWh` 
+- Fixed Cost: `{fixed_cost:.2f} €/MWh` 
+- Variable Cost: `{variable_cost:.2f} €/MWh` 
 - Commercial Markup: `{mark_up:.2f} €/MWh`  
 **→ Base Target Price:** `{target_price_base:.2f} €/MWh`
 """)
